@@ -1,0 +1,4 @@
+.git*
+.goreleaser.yaml
+.pre-commit-config.yaml
+*.md
