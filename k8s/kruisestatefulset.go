@@ -11,10 +11,35 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// kruiseAvailable prueft, ob der Cluster die OpenKruise-API ueberhaupt anbietet.
+//
+// Ohne diese Pruefung reisst eine fehlende API-Gruppe das ganze Suspendieren mit:
+// der API-Server antwortet auf eine unbekannte Gruppe mit 403 (Forbidden), nicht
+// mit 404. Der Fehler kommt aus GetSuspendables zurueck, und dann werden auch
+// Deployments, StatefulSets und CronJobs nicht mehr angehalten — gemessen am
+// 03.11.2026 an einem Namespace ohne OpenKruise-CRDs:
+//
+//	statefulsets.apps.kruise.io is forbidden: User "system:serviceaccount:..."
+//	cannot list resource "statefulsets" in API group "apps.kruise.io"
+func (k8s K8Simpl) kruiseAvailable() bool {
+	if k8s.clientset == nil || k8s.clientset.kruise == nil {
+		return false
+	}
+	_, err := k8s.clientset.kruise.Discovery().
+		ServerResourcesForGroupVersion("apps.kruise.io/v1beta1")
+	return err == nil
+}
+
 func (k8s K8Simpl) getKruiseStatefulSets(ctx context.Context, namespace string, labelSelectors []string) (map[string]kubesleep.Suspendable, error) {
 	statefulSets := &appsv1beta1.StatefulSetList{}
 	suspendables := map[string]kubesleep.Suspendable{}
 	var err error
+
+	if !k8s.kruiseAvailable() {
+		slog.Info("OpenKruise-API nicht vorhanden — StatefulSets werden uebersprungen", "namespace", namespace)
+		return suspendables, nil
+	}
+
 	if labelSelectors != nil && len(labelSelectors) > 0 {
 		for _, selector := range labelSelectors {
 			curStatefulSet, err := k8s.clientset.kruise.AppsV1beta1().
