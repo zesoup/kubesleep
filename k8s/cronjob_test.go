@@ -141,3 +141,39 @@ func (s *Integrationtest) TestCronJob_SuspendNoopWhenAlreadySuspended() {
 	s.Require().NoError(err)
 	s.Equal(before.ResourceVersion, after.ResourceVersion, "cronjob resourceVersion changed; suspend should be a no-op when already suspended")
 }
+
+// TestCronJob_IncludedByDefault prüft die Vorgabe: ohne --label-selector
+// (labelSelectors == nil) muss ein CronJob im Namespace erfasst und beim
+// Suspendieren angehalten werden. Das ist die Zusage, auf die sich der
+// openDesk-Nachtlauf verlässt.
+func (s *Integrationtest) TestCronJob_IncludedByDefault() {
+	ns := "cronjob-default"
+	deleteNamespace, err := testNamespace(s.ctx, ns, s.k8s, false)
+	s.Require().NoError(err)
+	defer deleteNamespace()
+
+	delete, err := CreateCronJob(s.ctx, *s.k8s, ns, "test-cronjob", false)
+	s.Require().NoError(err)
+	defer delete()
+
+	suspendables, err := s.k8s.GetSuspendables(s.ctx, ns, nil)
+	s.Require().NoError(err)
+
+	sus, ok := suspendables["2:test-cronjob"]
+	s.Require().True(ok, "CronJob fehlt in den Suspendables bei leerer Label-Auswahl")
+	s.Require().Equal(int32(1), sus.Replicas)
+
+	s.Require().NoError(sus.Suspend(s.ctx))
+
+	cj, err := s.k8s.clientset.BatchV1().CronJobs(ns).Get(s.ctx, "test-cronjob", metav1.GetOptions{})
+	s.Require().NoError(err)
+	s.Require().NotNil(cj.Spec.Suspend)
+	s.Require().True(*cj.Spec.Suspend, "CronJob ist nach dem Suspendieren nicht angehalten")
+
+	s.Require().NoError(s.k8s.ScaleSuspendable(s.ctx, ns, kubesleep.CronJob, "test-cronjob", sus.Replicas))
+
+	cj, err = s.k8s.clientset.BatchV1().CronJobs(ns).Get(s.ctx, "test-cronjob", metav1.GetOptions{})
+	s.Require().NoError(err)
+	s.Require().NotNil(cj.Spec.Suspend)
+	s.Require().False(*cj.Spec.Suspend, "CronJob ist nach dem Wecken nicht freigegeben")
+}

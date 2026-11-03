@@ -52,6 +52,18 @@ kubesleep wake --namespace dev
 
 Add `-v` or `-vv` to any command for info/debug logs.
 
+## CronJobs
+
+`kubesleep suspend` hält **alle** CronJobs des Namespace an (`spec.suspend: true`)
+und `kubesleep wake` gibt genau die wieder frei, die vorher liefen. Zeitpläne, die
+schon vorher angehalten waren, bleiben angehalten. Das ist die Vorgabe: es braucht
+keine Option und keine Annotation. Ohne diese Zusage würden die Zeitpläne einer
+schlafenden Umgebung weiter Jobs anlegen, die am fehlenden Rest der Umgebung
+scheitern.
+
+Der Service-Account braucht dafür `get`, `list` und `update` auf `batch/cronjobs`
+(siehe `deploy/kustomize/rbac.yaml`).
+
 ## Common use‑cases
 
 ### Wake
