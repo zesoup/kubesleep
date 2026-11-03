@@ -82,15 +82,15 @@ func (s *Unittest) TestMain_UpdateCheck_NonBlocking() {
 
 func (s *Unittest) TestMain_PrintsUpdateWhenReady() {
 	k8s, factory := NewMockK8S()
-	updateDone := make(chan struct{})
 	mockVersionUpdateCheck := func(_ *http.Client) (string, error) {
-		close(updateDone)
 		return "update!", nil
 	}
 
-	// Hold command execution until the update goroutine signaled readiness
+	// Die Aktualitaetspruefung laeuft in einer eigenen Goroutine; Main liest ihr
+	// Ergebnis erst nach der Ausfuehrung. Ohne diese Haltezeit ist der Test ein
+	// Wettlauf: auf einem Runner mit wenigen Kernen war das Ergebnis leer.
 	k8s.On("GetSuspendableNamespace", mock.Anything, mock.Anything).
-		Run(func(_ mock.Arguments) { <-updateDone }).
+		Run(func(_ mock.Arguments) { time.Sleep(100 * time.Millisecond) }).
 		Return(&suspendableNamespaceImpl{}, errExpected)
 
 	var outWriter, errWriter bytes.Buffer
