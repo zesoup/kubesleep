@@ -1,5 +1,17 @@
 version: 2
 
+# Angepasst fuer den Fork zesoup/kubesleep.
+#
+# Die Auslieferungskanaele von Y0-L0 brauchen Zugangsdaten, die es hier nicht
+# gibt, und die Datei Dockerfile.distroless liegt in diesem Fork nicht:
+#
+#   - homebrew_casks   -> HOMEBREW_TAP_TOKEN, Tap y0-l0/homebrew-tap
+#   - publishers/fury  -> FURY_TOKEN, FURY_ACCOUNT
+#   - dockers_v2       -> Dockerfile.distroless fehlt (Fork nutzt Dockerfile)
+#
+# Sie sind entfernt. Was bleibt, ist die Ausgabe, die die openDesk-Pipeline
+# braucht: Archive je Betriebssystem und Architektur samt Pruefsummen.
+
 builds:
   - id: kubesleep
     main: ./cmd/kubesleep/
@@ -23,7 +35,7 @@ nfpms:
     ids:
       - kubesleep
     vendor: stadimeter
-    homepage: https://github.com/Y0-L0/kubesleep
+    homepage: https://github.com/zesoup/kubesleep
     maintainer: "y0-l0 <jojo.dev@lohmer.com>"
     description: Suspend and wake Kubernetes workloads on a schedule
     license: AGPL-3.0
@@ -40,38 +52,6 @@ checksum:
 
 snapshot:
   version_template: "{{ .Tag }}-next"
-
-dockers_v2:
-  - images:
-      - ghcr.io/y0-l0/kubesleep
-    dockerfile: Dockerfile.distroless
-    tags:
-      - "{{ .Version }}"
-      - latest
-    labels:
-      org.opencontainers.image.title: "{{ .ProjectName }}"
-      org.opencontainers.image.version: "{{ .Version }}"
-      org.opencontainers.image.revision: "{{ .ShortCommit }}"
-      org.opencontainers.image.created: "{{ .Date }}"
-
-homebrew_casks:
-  - repository:
-      owner: y0-l0
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Casks
-    homepage: https://github.com/Y0-L0/kubesleep
-    description: Suspend and wake Kubernetes workloads on a schedule
-    license: AGPL-3.0
-
-publishers:
-  - name: fury
-    ids:
-      - linux-packages
-    checksum: false
-    signature: false
-    dir: "{{ dir .ArtifactPath }}"
-    cmd: "curl -v -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/{{ .Env.FURY_ACCOUNT }}/"
 
 changelog:
   sort: asc
